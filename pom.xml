@@ -51,6 +51,12 @@
             <scope>provided</scope>
         </dependency>
 
+        <dependency>
+            <groupId>com.phobia.levels</groupId>
+            <artifactId>levels</artifactId>
+            <version>0.0.1</version>
+        </dependency>
+
     </dependencies>
 
 </project>

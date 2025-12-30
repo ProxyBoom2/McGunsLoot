@@ -3,6 +3,7 @@ main: com.loottables.mcgunsloot.McGunsLoot
 version: 1.0.0
 api-version: 1.19
 author: ProxyBoom
+depend: [levels]
 commands:
   loots:
     description: Opens the loot table editor or reloads config.
