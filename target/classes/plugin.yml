@@ -1,0 +1,13 @@
+name: McGunsLoot
+main: com.loottables.mcgunsloot.McGunsLoot
+version: 1.0.0
+api-version: 1.19
+author: ProxyBoom
+commands:
+  loots:
+    description: Opens the loot table editor or reloads config.
+    usage: /loots [reload]
+    permission: mcgunsloot.use
+permissions:
+  mcgunsloot.use:
+    default: true
