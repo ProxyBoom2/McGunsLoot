@@ -21,16 +21,27 @@ public class ChestListener implements Listener {
 
     @EventHandler
     public void onChestOpen(InventoryOpenEvent event) {
-
         if (!(event.getPlayer() instanceof Player player)) return;
         if (!(event.getInventory().getHolder() instanceof Chest chest)) return;
 
         Location loc = chest.getLocation();
         if (!lootManager.isLinked(loc)) return;
 
+        // Cancel vanilla opening to show our custom UI
         event.setCancelled(true);
 
-        Inventory inv = CustomInventoryFactory.createLootInventory(lootManager, loc, player);
+        int cd = lootManager.getRemainingCooldown(player, loc);
+        Inventory inv;
+
+        if (cd > 0) {
+            // Player is on cooldown: Retrieve the inventory they were just using
+            inv = lootManager.getOrCreateActiveInventory(player, loc);
+        } else {
+            // Cooldown is 0: Generate fresh loot and save it as their new active inventory
+            inv = CustomInventoryFactory.createLootInventory(lootManager, loc, player);
+            lootManager.saveActiveInventory(player, loc, inv);
+        }
+
         player.openInventory(inv);
 
         // Update clock every second
@@ -47,10 +58,10 @@ public class ChestListener implements Listener {
                     return;
                 }
 
-                int cd = lootManager.getRemainingCooldown(player, loc);
-                CustomInventoryFactory.updateClock(inv, cd);
+                int currentCd = lootManager.getRemainingCooldown(player, loc);
+                CustomInventoryFactory.updateClock(inv, currentCd);
 
-                if (cd <= 0) cancel();
+                if (currentCd <= 0) cancel();
             }
         }.runTaskTimer(plugin, 20L, 20L);
     }

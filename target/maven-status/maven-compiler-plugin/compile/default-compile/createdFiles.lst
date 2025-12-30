@@ -1,14 +1,6 @@
-com\loottables\mcgunsloot\TitleUpdaterTask.class
+com\loottables\mcgunsloot\LootTable.class
 com\loottables\mcgunsloot\ChestListener$1.class
-com\loottables\mcgunsloot\CustomInventoryFactory.class
 com\loottables\mcgunsloot\LootManager.class
 com\loottables\mcgunsloot\McGunsLoot.class
-com\loottables\mcgunsloot\LootCommand.class
-com\loottables\mcgunsloot\LootEntry.class
-com\loottables\mcgunsloot\LootTable.class
-com\loottables\mcgunsloot\LootTable$GeneratedLoot.class
-com\loottables\mcgunsloot\CooldownPaneTask.class
-com\loottables\mcgunsloot\GuiManager.class
 com\loottables\mcgunsloot\ChestListener.class
-com\loottables\mcgunsloot\InventoryLockListener.class
-com\loottables\mcgunsloot\LocationCooldownResolver.class
+com\loottables\mcgunsloot\LootEntry.class

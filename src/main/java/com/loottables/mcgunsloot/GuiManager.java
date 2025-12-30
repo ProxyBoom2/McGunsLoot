@@ -1,7 +1,9 @@
 package com.loottables.mcgunsloot;
 
+import java.util.ArrayList; // FIXED: Import for image_3c4cca.png
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.bukkit.Bukkit;
@@ -19,7 +21,6 @@ public class GuiManager implements Listener {
 
     private final McGunsLoot plugin;
     private final LootManager lootManager;
-
     private final Map<Player, LootTable> editing = new HashMap<>();
 
     public GuiManager(McGunsLoot plugin, LootManager lootManager) {
@@ -28,35 +29,39 @@ public class GuiManager implements Listener {
     }
 
     public void openEditor(Player player, LootTable table) {
-
         editing.put(player, table);
 
-        Inventory gui = Bukkit.createInventory(null, 54,
-                "Loot Editor: " + table.getName());
+        Inventory gui = Bukkit.createInventory(null, 54, "Loot Editor: " + table.getName());
 
         int slot = 0;
         for (LootEntry e : table.getEntries()) {
-            ItemStack item = new ItemStack(e.getMaterial());
+            if (slot >= 53) break; // Leave last slot for the "Add" button
+            
+            ItemStack item = e.getItemStack().clone(); 
             ItemMeta meta = item.getItemMeta();
 
-            meta.setDisplayName("§e" + e.getMaterial().name());
-            meta.setLore(Arrays.asList(
-                    "§7Min: §f" + e.getMin(),
-                    "§7Max: §f" + e.getMax(),
-                    "§7Weight: §f" + e.getWeight(),
-                    "",
-                    "§cClick to remove"
-            ));
+            // FIXED: Using ArrayList from the import above
+            List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
+            lore.add("");
+            lore.add("§6--- Editor Stats ---");
+            lore.add("§7Min: §f" + e.getMin());
+            lore.add("§7Max: §f" + e.getMax());
+            lore.add("§7Weight: §f" + e.getWeight());
+            lore.add("§7Req Level: §b" + e.getMinLevel()); 
+            lore.add("");
+            lore.add("§cClick to remove");
 
+            meta.setLore(lore);
             item.setItemMeta(meta);
             gui.setItem(slot++, item);
         }
 
+        // Add New Entry Button
         ItemStack add = new ItemStack(Material.EMERALD_BLOCK);
         ItemMeta am = add.getItemMeta();
         am.setDisplayName("§aAdd New Loot Entry");
+        am.setLore(Arrays.asList("§7(Adds a default Diamond)", "§7Use /loots additem for custom items"));
         add.setItemMeta(am);
-
         gui.setItem(53, add);
 
         player.openInventory(gui);
@@ -64,7 +69,6 @@ public class GuiManager implements Listener {
 
     @EventHandler
     public void onClick(InventoryClickEvent event) {
-
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (!event.getView().getTitle().startsWith("Loot Editor: ")) return;
 
@@ -75,14 +79,16 @@ public class GuiManager implements Listener {
 
         int slot = event.getRawSlot();
 
+        // Add Item Logic
         if (slot == 53) {
-            table.addEntry(new LootEntry(Material.DIAMOND, 1, 1, 10));
+            table.addEntry(new LootEntry(new ItemStack(Material.DIAMOND), 1, 1, 10, 0));
             lootManager.saveToConfig();
             openEditor(player, table);
             return;
         }
 
-        if (slot < table.getEntries().size()) {
+        // Remove Item Logic (FIXED: Calls table.removeEntry for image_3bf271.png)
+        if (slot >= 0 && slot < table.getEntries().size()) {
             table.removeEntry(slot);
             lootManager.saveToConfig();
             openEditor(player, table);
@@ -93,7 +99,6 @@ public class GuiManager implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (event.getView().getTitle().startsWith("Loot Editor: ")) {
             editing.remove((Player) event.getPlayer());
-            lootManager.saveToConfig();
         }
     }
 }

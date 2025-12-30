@@ -48,13 +48,16 @@
             <groupId>com.comphenix.protocol</groupId>
             <artifactId>ProtocolLib</artifactId>
             <version>4.8.0</version>
-            <scope>provided</scope>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/ProtocolLib.jar</systemPath>
         </dependency>
 
         <dependency>
             <groupId>com.phobia.levels</groupId>
             <artifactId>levels</artifactId>
             <version>0.0.1</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/levels.jar</systemPath>
         </dependency>
 
     </dependencies>
