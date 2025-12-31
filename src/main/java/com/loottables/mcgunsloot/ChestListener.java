@@ -30,17 +30,9 @@ public class ChestListener implements Listener {
         // Cancel vanilla opening to show our custom UI
         event.setCancelled(true);
 
-        int cd = lootManager.getRemainingCooldown(player, loc);
-        Inventory inv;
-
-        if (cd > 0) {
-            // Player is on cooldown: Retrieve the inventory they were just using
-            inv = lootManager.getOrCreateActiveInventory(player, loc);
-        } else {
-            // Cooldown is 0: Generate fresh loot and save it as their new active inventory
-            inv = CustomInventoryFactory.createLootInventory(lootManager, loc, player);
-            lootManager.saveActiveInventory(player, loc, inv);
-        }
+        // PATCH: Always use LootManager to fetch the inventory.
+        // This ensures the Reward logic and Debug logs inside LootManager are always triggered.
+        Inventory inv = lootManager.getOrCreateActiveInventory(player, loc);
 
         player.openInventory(inv);
 

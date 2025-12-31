@@ -21,11 +21,9 @@ public class LootManager {
     private final McGunsLoot plugin;
     private final Map<String, LootTable> tables = new HashMap<>();
     
-    // PATCH: ConcurrentHashMap prevents crashes if linking while the background loader runs
     private final Map<Location, String> linkedChests = new ConcurrentHashMap<>();
     private final Map<Location, Map<UUID, Long>> cooldowns = new ConcurrentHashMap<>();
     
-    // Tracks current active loot sessions
     private final Map<UUID, Map<Location, Inventory>> activeInventories = new HashMap<>();
     
     private final Random random = new Random();
@@ -35,6 +33,47 @@ public class LootManager {
     }
 
     public Random getRandom() { return random; }
+
+    // ================= SPECIAL REWARDS (XP & TOKENS) =================
+
+    /**
+     * Rolls for extra XP and Token rewards based on config chances.
+     */
+    public void applySpecialRewards(Player player) {
+        FileConfiguration config = plugin.getConfig();
+
+        // 1. XP Rewards
+        double xpChance = config.getDouble("rewards.xp.chance", 100.0);
+        double xpRoll = random.nextDouble() * 100;
+        
+        if (xpRoll < xpChance) {
+            int min = config.getInt("rewards.xp.min", 10);
+            int max = config.getInt("rewards.xp.max", 50);
+            int amount = random.nextInt((max - min) + 1) + min;
+            
+            String rawXpCmd = config.getString("rewards.xp.command", "givexp %player% %amount%");
+            String finalXpCmd = rawXpCmd.replace("%player%", player.getName())
+                                        .replace("%amount%", String.valueOf(amount));
+            
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalXpCmd);
+        }
+
+        // 2. Token Rewards
+        double tokenChance = config.getDouble("rewards.tokens.chance", 100.0);
+        double tokenRoll = random.nextDouble() * 100;
+
+        if (tokenRoll < tokenChance) {
+            int min = config.getInt("rewards.tokens.min", 1);
+            int max = config.getInt("rewards.tokens.max", 5);
+            int amount = random.nextInt((max - min) + 1) + min;
+
+            String rawTokenCmd = config.getString("rewards.tokens.command", "tokens give %player% %amount%");
+            String finalTokenCmd = rawTokenCmd.replace("%player%", player.getName())
+                                             .replace("%amount%", String.valueOf(amount));
+            
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), finalTokenCmd);
+        }
+    }
 
     // ================= SESSION MANAGEMENT =================
 
@@ -46,21 +85,25 @@ public class LootManager {
 
     public Inventory getOrCreateActiveInventory(Player player, Location loc) {
         Map<Location, Inventory> playerMap = activeInventories.get(player.getUniqueId());
+        
         if (playerMap != null && playerMap.containsKey(loc)) {
-            return playerMap.get(loc);
+            if (getRemainingCooldown(player, loc) > 0) {
+                return playerMap.get(loc);
+            }
         }
+
+        applySpecialRewards(player);
+
         Inventory inv = CustomInventoryFactory.createLootInventory(this, loc, player);
         saveActiveInventory(player, loc, inv);
         return inv;
     }
 
-    // ================= CHEST PARTICLE SUPPORT =================
+    // ================= REST OF FILE (COOLDOWNS/TABLES/CONFIG) =================
 
     public Set<Location> getLinkedChestLocations() {
         return linkedChests.keySet();
     }
-
-    // ================= TABLES =================
 
     public LootTable createTable(String name) {
         LootTable table = new LootTable(name);
@@ -80,8 +123,6 @@ public class LootManager {
     public Set<String> getAllTableNames() {
         return tables.keySet();
     }
-
-    // ================= CHESTS =================
 
     public void linkChest(Location loc, String tableName) {
         linkedChests.put(loc, tableName.toLowerCase());
@@ -103,8 +144,6 @@ public class LootManager {
         return name == null ? null : tables.get(name.toLowerCase());
     }
 
-    // ================= COOLDOWNS =================
-
     public int getRemainingCooldown(Player player, Location loc) {
         Map<UUID, Long> map = cooldowns.get(loc);
         if (map == null) return 0;
@@ -122,8 +161,6 @@ public class LootManager {
             .put(player.getUniqueId(), System.currentTimeMillis() + (seconds * 1000L));
     }
 
-    // ================= CONFIG & RETRY LOGIC =================
-
     public void loadFromConfig() {
         tables.clear();
         linkedChests.clear();
@@ -132,7 +169,6 @@ public class LootManager {
 
         FileConfiguration cfg = plugin.getConfig();
         
-        // 1. Load Tables
         ConfigurationSection tSec = cfg.getConfigurationSection("tables");
         if (tSec != null) {
             for (String name : tSec.getKeys(false)) {
@@ -144,21 +180,15 @@ public class LootManager {
             }
         }
 
-        // 2. Load Chests via Retry Loop
         attemptChestLoad();
     }
 
-    /**
-     * Attempts to load chests. If a world isn't loaded yet (like Greenfield),
-     * it will wait 5 seconds and try again.
-     */
     private void attemptChestLoad() {
         FileConfiguration cfg = plugin.getConfig();
         ConfigurationSection cSec = cfg.getConfigurationSection("chests");
         if (cSec == null) return;
 
         boolean missingWorld = false;
-        int loadedInThisPass = 0;
 
         for (String key : cSec.getKeys(false)) {
             ConfigurationSection sec = cSec.getConfigurationSection(key);
@@ -167,40 +197,28 @@ public class LootManager {
             String worldName = sec.getString("world");
             World world = (worldName != null) ? Bukkit.getWorld(worldName) : null;
             
-            // If the world is null, Greenfield likely isn't loaded yet.
             if (world == null) {
                 missingWorld = true;
                 continue;
             }
 
-            // Absolute precision using getInt
-            Location loc = new Location(
-                    world,
-                    sec.getInt("x"),
-                    sec.getInt("y"),
-                    sec.getInt("z")
-            );
-
-            // Avoid duplicate links if the retry runs multiple times
+            Location loc = new Location(world, sec.getInt("x"), sec.getInt("y"), sec.getInt("z"));
             if (linkedChests.containsKey(loc)) continue;
 
             String tableName = sec.getString("table");
             if (tableName != null && tables.containsKey(tableName.toLowerCase())) {
                 linkedChests.put(loc, tableName.toLowerCase());
-                loadedInThisPass++;
             }
         }
 
         if (missingWorld) {
-            plugin.getLogger().warning("[McGunsLoot] Some worlds are not yet loaded. Retrying chest-links in 5 seconds...");
+            plugin.getLogger().warning("[McGunsLoot] Some worlds not loaded. Retrying links in 5s...");
             new BukkitRunnable() {
                 @Override
-                public void run() {
-                    attemptChestLoad();
-                }
-            }.runTaskLater(plugin, 100L); // 100 ticks = 5 seconds
+                public void run() { attemptChestLoad(); }
+            }.runTaskLater(plugin, 100L);
         } else {
-            plugin.getLogger().info("[McGunsLoot] Successfully loaded " + linkedChests.size() + " total linked chests.");
+            plugin.getLogger().info("[McGunsLoot] Loaded " + linkedChests.size() + " chests.");
         }
     }
 
@@ -209,12 +227,10 @@ public class LootManager {
         cfg.set("tables", null);
         cfg.set("chests", null);
 
-        // Save Tables
         for (Map.Entry<String, LootTable> entry : tables.entrySet()) {
             entry.getValue().saveToConfig(cfg.createSection("tables." + entry.getKey()));
         }
 
-        // Save Chests
         int index = 0;
         for (Map.Entry<Location, String> entry : linkedChests.entrySet()) {
             Location loc = entry.getKey();
@@ -222,15 +238,12 @@ public class LootManager {
 
             String path = "chests." + index;
             cfg.set(path + ".world", loc.getWorld().getName());
-            
-            // PATCH: Save as Integers to ensure perfect block alignment
             cfg.set(path + ".x", loc.getBlockX());
             cfg.set(path + ".y", loc.getBlockY());
             cfg.set(path + ".z", loc.getBlockZ());
             cfg.set(path + ".table", entry.getValue());
             index++;
         }
-
         plugin.saveConfig();
     }
 }
