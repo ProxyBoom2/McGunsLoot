@@ -20,41 +20,47 @@ public class CustomInventoryFactory {
     public static final int CLOCK_SLOT = 26;
 
     public static Inventory createLootInventory(LootManager lootManager, Location loc, Player player) {
-        // FIXED: Simpler retrieval to avoid null errors if a chest is unlinked mid-open
         LootTable table = lootManager.getLootTable(loc);
         int cd = lootManager.getRemainingCooldown(player, loc);
 
         String title = "§6§lMCGUNS";
         Inventory inv = Bukkit.createInventory(null, 27, title);
 
-        // Only populate if cooldown is 0
         if (cd <= 0 && table != null) {
             int playerLevel = PlayerLevelUpEvent.getLevel(player);
 
+            // Filter for level-appropriate loot
             List<LootEntry> accessibleLoot = table.getEntries().stream()
                 .filter(entry -> playerLevel >= entry.getMinLevel())
-                .collect(Collectors.toList());
+                .collect(Collectors.toCollection(ArrayList::new));
 
             if (!accessibleLoot.isEmpty()) {
-                // Determine how many slots to fill (2 to 4)
-                int rolls = 2 + lootManager.getRandom().nextInt(3); 
-                
+                // Shuffle the loot list so the "first 4" successes are random items
+                Collections.shuffle(accessibleLoot);
+
                 List<Integer> slots = new ArrayList<>();
                 for (int i = 0; i < 26; i++) slots.add(i);
                 Collections.shuffle(slots);
+                
+                int itemsFound = 0;
+                int maxItems = 1 + lootManager.getRandom().nextInt(4); // Target: 1 to 4 items
 
-                for (int i = 0; i < rolls && i < slots.size(); i++) {
-                    LootEntry entry = getWeightedRandomFromList(accessibleLoot, lootManager.getRandom());
-                    if (entry != null) {
-                        ItemStack lootItem = entry.getItemStack().clone();
-                        int amount = entry.getMin() + lootManager.getRandom().nextInt(entry.getMax() - entry.getMin() + 1);
-                        lootItem.setAmount(amount);
-                        
-                        inv.setItem(slots.get(i), lootItem);
+                for (LootEntry entry : accessibleLoot) {
+                    // Stop once we hit our random cap (1-4)
+                    if (itemsFound >= maxItems) break;
+
+                    double roll = lootManager.getRandom().nextDouble() * 100;
+                    if (roll < entry.getWeight()) {
+                        spawnItemInInv(inv, entry, slots.get(itemsFound), lootManager);
+                        itemsFound++;
                     }
                 }
-                // IMPORTANT: The cooldown is set here. 
-                // In your ChestListener, we ensure this inventory is saved so it doesn't disappear.
+
+                // PITY SYSTEM: If 0 items passed their % roll, force 1 random item
+                if (itemsFound == 0 && !accessibleLoot.isEmpty()) {
+                    spawnItemInInv(inv, accessibleLoot.get(0), slots.get(0), lootManager);
+                }
+                
                 lootManager.setCooldown(loc, player, table.getCooldownSeconds());
             } else {
                 player.sendMessage("§cYou aren't a high enough level to find anything here!");
@@ -65,30 +71,27 @@ public class CustomInventoryFactory {
         return inv;
     }
 
-    private static LootEntry getWeightedRandomFromList(List<LootEntry> entries, java.util.Random random) {
-        int totalWeight = entries.stream().mapToInt(LootEntry::getWeight).sum();
-        if (totalWeight <= 0) return null;
-        
-        int roll = random.nextInt(totalWeight);
-        int current = 0;
-        for (LootEntry entry : entries) {
-            current += entry.getWeight();
-            if (roll < current) return entry;
-        }
-        return null;
+    private static void spawnItemInInv(Inventory inv, LootEntry entry, int slot, LootManager lootManager) {
+        ItemStack lootItem = entry.getItemStack().clone();
+        int min = entry.getMin();
+        int max = entry.getMax();
+        int amount = (max <= min) ? min : min + lootManager.getRandom().nextInt(max - min + 1);
+        lootItem.setAmount(amount);
+        inv.setItem(slot, lootItem);
     }
 
     public static void updateClock(Inventory inv, int seconds) {
         inv.setItem(CLOCK_SLOT, createClock(seconds));
     }
 
-    private static ItemStack createClock(int seconds) {
+    public static ItemStack createClock(int seconds) {
         ItemStack clock = new ItemStack(Material.CLOCK);
         ItemMeta meta = clock.getItemMeta();
-        meta.setDisplayName("§6§lCooldown");
-        // Simplified Lore formatting
-        meta.setLore(List.of("§7Next loot in:", "§c" + (seconds < 0 ? 0 : seconds) + " seconds"));
-        clock.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName("§6§lCooldown");
+            meta.setLore(List.of("§7Next loot in:", "§c" + (Math.max(seconds, 0)) + " seconds"));
+            clock.setItemMeta(meta);
+        }
         return clock;
     }
 }

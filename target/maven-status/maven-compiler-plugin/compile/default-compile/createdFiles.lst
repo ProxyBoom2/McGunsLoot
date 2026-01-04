@@ -1,6 +1,6 @@
-com\loottables\mcgunsloot\LootTable.class
 com\loottables\mcgunsloot\ChestListener$1.class
 com\loottables\mcgunsloot\LootManager.class
 com\loottables\mcgunsloot\McGunsLoot.class
-com\loottables\mcgunsloot\ChestListener.class
 com\loottables\mcgunsloot\LootEntry.class
+com\loottables\mcgunsloot\LootTable.class
+com\loottables\mcgunsloot\ChestListener.class

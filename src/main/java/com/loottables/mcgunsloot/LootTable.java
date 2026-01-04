@@ -20,11 +20,9 @@ public class LootTable {
     public void setCooldownSeconds(int seconds) { this.cooldownSeconds = seconds; }
     public int getCooldownSeconds() { return cooldownSeconds; }
 
-    /**
-     * Updated to support all parameters from the /loots additem command.
-     */
-    public void addItem(ItemStack item, int minLevel, int min, int max, int weight) {
-        entries.add(new LootEntry(item, min, max, weight, minLevel));
+    public void addItem(ItemStack item, int minLevel, int min, int max, int chance) {
+        // We still use LootEntry, but 'weight' is now treated as 'chance'
+        entries.add(new LootEntry(item, min, max, chance, minLevel));
     }
 
     public void addEntry(LootEntry entry) { entries.add(entry); }
@@ -35,6 +33,34 @@ public class LootTable {
 
     public List<LootEntry> getEntries() { return Collections.unmodifiableList(entries); }
 
+    /**
+     * Logic Change: Independent Percentage Rolls
+     * This method will return a list of items that "passed" their percentage check.
+     */
+    public List<ItemStack> rollLoot() {
+        List<ItemStack> results = new ArrayList<>();
+        
+        for (LootEntry entry : entries) {
+            // Roll 0.0 to 100.0
+            double roll = random.nextDouble() * 100;
+            
+            // If weight is 5, it needs to roll below 5.0 to succeed
+            if (roll < entry.getWeight()) {
+                ItemStack stack = entry.getItemStack().clone();
+                
+                // Determine random amount between min and max
+                int amount = entry.getMin();
+                if (entry.getMax() > entry.getMin()) {
+                    amount = random.nextInt((entry.getMax() - entry.getMin()) + 1) + entry.getMin();
+                }
+                
+                stack.setAmount(amount);
+                results.add(stack);
+            }
+        }
+        return results;
+    }
+
     public void saveToConfig(ConfigurationSection section) {
         section.set("cooldown", cooldownSeconds);
         section.set("items", null); 
@@ -44,7 +70,7 @@ public class LootTable {
             cs.set("item", e.getItemStack()); 
             cs.set("min", e.getMin());
             cs.set("max", e.getMax());
-            cs.set("weight", e.getWeight());
+            cs.set("weight", e.getWeight()); // Keeping key as 'weight' to avoid breaking old configs
             cs.set("minLevel", e.getMinLevel());
         }
     }
@@ -76,7 +102,7 @@ public class LootTable {
                         item,
                         cs.getInt("min", 1),
                         cs.getInt("max", 1),
-                        cs.getInt("weight", 10),
+                        cs.getInt("weight", 10), // This is now 10%
                         cs.getInt("minLevel", 0)
                 ));
             }
