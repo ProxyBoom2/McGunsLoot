@@ -1,6 +1,6 @@
 package com.loottables.mcgunsloot;
 
-import java.util.ArrayList; // FIXED: Import for image_3c4cca.png
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -11,6 +11,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.inventory.Inventory;
@@ -35,12 +36,11 @@ public class GuiManager implements Listener {
 
         int slot = 0;
         for (LootEntry e : table.getEntries()) {
-            if (slot >= 53) break; // Leave last slot for the "Add" button
+            if (slot >= 53) break; 
             
             ItemStack item = e.getItemStack().clone(); 
             ItemMeta meta = item.getItemMeta();
 
-            // FIXED: Using ArrayList from the import above
             List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
             lore.add("");
             lore.add("§6--- Editor Stats ---");
@@ -56,7 +56,6 @@ public class GuiManager implements Listener {
             gui.setItem(slot++, item);
         }
 
-        // Add New Entry Button
         ItemStack add = new ItemStack(Material.EMERALD_BLOCK);
         ItemMeta am = add.getItemMeta();
         am.setDisplayName("§aAdd New Loot Entry");
@@ -70,28 +69,50 @@ public class GuiManager implements Listener {
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
-        if (!event.getView().getTitle().startsWith("Loot Editor: ")) return;
+        String title = event.getView().getTitle();
 
-        event.setCancelled(true);
+        // 1. Handle Loot Chest Interaction (The Fix)
+        if (title.equals("§6§lMCGUNS")) {
+            // Cancel if clicking the clock slot directly
+            if (event.getRawSlot() == CustomInventoryFactory.CLOCK_SLOT) {
+                event.setCancelled(true);
+                return;
+            }
 
-        LootTable table = editing.get(player);
-        if (table == null) return;
-
-        int slot = event.getRawSlot();
-
-        // Add Item Logic
-        if (slot == 53) {
-            table.addEntry(new LootEntry(new ItemStack(Material.DIAMOND), 1, 1, 10, 0));
-            lootManager.saveToConfig();
-            openEditor(player, table);
-            return;
+            // Prevent duplicating/moving the clock via Shift-Click or Hotkeys
+            if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY || 
+                event.getAction() == InventoryAction.HOTBAR_SWAP || 
+                event.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD) {
+                
+                ItemStack current = event.getCurrentItem();
+                if (current != null && current.getType() == Material.CLOCK) {
+                    event.setCancelled(true);
+                }
+            }
+            return; 
         }
 
-        // Remove Item Logic (FIXED: Calls table.removeEntry for image_3bf271.png)
-        if (slot >= 0 && slot < table.getEntries().size()) {
-            table.removeEntry(slot);
-            lootManager.saveToConfig();
-            openEditor(player, table);
+        // 2. Handle Loot Editor Interaction
+        if (title.startsWith("Loot Editor: ")) {
+            event.setCancelled(true);
+
+            LootTable table = editing.get(player);
+            if (table == null) return;
+
+            int slot = event.getRawSlot();
+
+            if (slot == 53) {
+                table.addEntry(new LootEntry(new ItemStack(Material.DIAMOND), 1, 1, 10, 0));
+                lootManager.saveToConfig();
+                openEditor(player, table);
+                return;
+            }
+
+            if (slot >= 0 && slot < table.getEntries().size()) {
+                table.removeEntry(slot);
+                lootManager.saveToConfig();
+                openEditor(player, table);
+            }
         }
     }
 
