@@ -19,17 +19,17 @@ public class McGunsLoot extends JavaPlugin {
         lootManager = new LootManager(this);
         guiManager = new GuiManager(this, lootManager);
         
-        // Load data - Includes retry logic for external worlds like Greenfield
+        // Load data
         lootManager.loadFromConfig();
 
         getServer().getPluginManager().registerEvents(new ChestListener(this, lootManager), this);
         getServer().getPluginManager().registerEvents(guiManager, this);
 
-        LootCommand command = new LootCommand(lootManager, guiManager);
+        LootCommand command = new LootCommand(lootManager, guiManager, this);
         getCommand("loots").setExecutor(command);
         getCommand("loots").setTabCompleter(command);
 
-        // Optimized Particle Task: Only checks chests near online players
+        // Particle Task
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -37,10 +37,8 @@ public class McGunsLoot extends JavaPlugin {
 
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     for (Location loc : lootManager.getLinkedChestLocations()) {
-                        // Check world first
                         if (loc.getWorld() == null || !p.getWorld().equals(loc.getWorld())) continue;
                         
-                        // Only process if within 12 blocks for performance
                         if (p.getLocation().distanceSquared(loc) < 144) {
                             if (lootManager.getRemainingCooldown(p, loc) == 0) {
                                 p.spawnParticle(
@@ -55,13 +53,21 @@ public class McGunsLoot extends JavaPlugin {
             }
         }.runTaskTimer(this, 20L, 20L);
 
-        getLogger().info("McGunsLoot enabled. Greenfield-Ready load system active.");
+        getLogger().info("McGunsLoot enabled. Data persistence fixed.");
+    }
+
+    /**
+     * Helper method to reload the plugin entirely
+     */
+    public void reloadPlugin() {
+        reloadConfig();
+        lootManager.loadFromConfig();
     }
 
     @Override
     public void onDisable() {
-        if (lootManager != null) {
-            lootManager.saveToConfig();
-        }
+        // REMOVED lootManager.saveToConfig() 
+        // This prevents the plugin from overwriting your manual config edits on shutdown!
+        getLogger().info("McGunsLoot disabled safely.");
     }
 }

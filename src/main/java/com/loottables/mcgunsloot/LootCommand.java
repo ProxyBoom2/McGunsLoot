@@ -17,14 +17,27 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
     private final LootManager lootManager;
     private final GuiManager guiManager;
+    private final org.bukkit.plugin.java.JavaPlugin plugin;
 
-    public LootCommand(LootManager lootManager, GuiManager guiManager) {
+    public LootCommand(LootManager lootManager, GuiManager guiManager, org.bukkit.plugin.java.JavaPlugin plugin) {
         this.lootManager = lootManager;
         this.guiManager = guiManager;
+        this.plugin = plugin;
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+
+        if (args[0].equalsIgnoreCase("reload")) {
+    if (!sender.hasPermission("mcgunsloot.admin")) return true;
+    
+    // Reload the configuration
+    plugin.reloadConfig();
+    lootManager.loadFromConfig();
+    
+    sender.sendMessage("§a[McGunsLoot] Config and Loot Tables reloaded!");
+    return true;
+}
 
         if (!(sender instanceof Player player)) {
             sender.sendMessage("This command can only be used in-game.");

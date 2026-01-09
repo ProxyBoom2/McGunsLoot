@@ -36,14 +36,11 @@ public class LootManager {
 
     // ================= SPECIAL REWARDS (XP & TOKENS) =================
 
-    /**
-     * Rolls for extra XP and Token rewards based on config chances.
-     */
     public void applySpecialRewards(Player player) {
         FileConfiguration config = plugin.getConfig();
 
         // 1. XP Rewards
-        double xpChance = config.getDouble("rewards.xp.chance", 100.0);
+        double xpChance = config.getDouble("rewards.xp.chance", 1.0);
         double xpRoll = random.nextDouble() * 100;
         
         if (xpRoll < xpChance) {
@@ -59,7 +56,7 @@ public class LootManager {
         }
 
         // 2. Token Rewards
-        double tokenChance = config.getDouble("rewards.tokens.chance", 100.0);
+        double tokenChance = config.getDouble("rewards.tokens.chance", 1.0);
         double tokenRoll = random.nextDouble() * 100;
 
         if (tokenRoll < tokenChance) {
@@ -99,75 +96,23 @@ public class LootManager {
         return inv;
     }
 
-    // ================= REST OF FILE (COOLDOWNS/TABLES/CONFIG) =================
-
-    public Set<Location> getLinkedChestLocations() {
-        return linkedChests.keySet();
-    }
-
-    public LootTable createTable(String name) {
-        LootTable table = new LootTable(name);
-        tables.put(name.toLowerCase(), table);
-        saveToConfig();
-        return table;
-    }
-
-    public LootTable getTable(String name) {
-        return tables.get(name.toLowerCase());
-    }
-
-    public boolean tableExists(String name) {
-        return tables.containsKey(name.toLowerCase());
-    }
-
-    public Set<String> getAllTableNames() {
-        return tables.keySet();
-    }
-
-    public void linkChest(Location loc, String tableName) {
-        linkedChests.put(loc, tableName.toLowerCase());
-        saveToConfig(); 
-    }
-
-    public void unlinkChest(Location loc) {
-        linkedChests.remove(loc);
-        cooldowns.remove(loc);
-        saveToConfig();
-    }
-
-    public boolean isLinked(Location loc) {
-        return linkedChests.containsKey(loc);
-    }
-
-    public LootTable getLootTable(Location loc) {
-        String name = linkedChests.get(loc);
-        return name == null ? null : tables.get(name.toLowerCase());
-    }
-
-    public int getRemainingCooldown(Player player, Location loc) {
-        Map<UUID, Long> map = cooldowns.get(loc);
-        if (map == null) return 0;
-
-        Long expires = map.get(player.getUniqueId());
-        if (expires == null) return 0;
-
-        long diff = expires - System.currentTimeMillis();
-        return diff > 0 ? (int) (diff / 1000) : 0;
-    }
-
-    public void setCooldown(Location loc, Player player, int seconds) {
-        cooldowns
-            .computeIfAbsent(loc, k -> new ConcurrentHashMap<>())
-            .put(player.getUniqueId(), System.currentTimeMillis() + (seconds * 1000L));
-    }
+    // ================= CONFIG & DATA MANAGEMENT =================
 
     public void loadFromConfig() {
+        // FORCE the plugin to read the file from disk, ignoring memory
+        plugin.reloadConfig();
+        FileConfiguration cfg = plugin.getConfig();
+
         tables.clear();
         linkedChests.clear();
         cooldowns.clear();
         activeInventories.clear();
-
-        FileConfiguration cfg = plugin.getConfig();
+        
+        // Ensure Reward defaults are present in the config if they are missing
+        boolean needsSave = false;
+        if (!cfg.contains("rewards.xp.chance")) { cfg.set("rewards.xp.chance", 1.0); needsSave = true; }
+        if (!cfg.contains("rewards.tokens.chance")) { cfg.set("rewards.tokens.chance", 1.0); needsSave = true; }
+        if (needsSave) plugin.saveConfig();
         
         ConfigurationSection tSec = cfg.getConfigurationSection("tables");
         if (tSec != null) {
@@ -181,6 +126,35 @@ public class LootManager {
         }
 
         attemptChestLoad();
+    }
+
+    public void saveToConfig() {
+        FileConfiguration cfg = plugin.getConfig();
+        
+        // Build tables and chests from scratch
+        cfg.set("tables", null);
+        cfg.set("chests", null);
+
+        for (Map.Entry<String, LootTable> entry : tables.entrySet()) {
+            entry.getValue().saveToConfig(cfg.createSection("tables." + entry.getKey()));
+        }
+
+        int index = 0;
+        for (Map.Entry<Location, String> entry : linkedChests.entrySet()) {
+            Location loc = entry.getKey();
+            if (loc.getWorld() == null) continue;
+
+            String path = "chests." + index;
+            cfg.set(path + ".world", loc.getWorld().getName());
+            cfg.set(path + ".x", loc.getBlockX());
+            cfg.set(path + ".y", loc.getBlockY());
+            cfg.set(path + ".z", loc.getBlockZ());
+            cfg.set(path + ".table", entry.getValue());
+            index++;
+        }
+        
+        // Save the file. Because we didn't touch the "rewards" key, it remains as is.
+        plugin.saveConfig();
     }
 
     private void attemptChestLoad() {
@@ -212,38 +186,44 @@ public class LootManager {
         }
 
         if (missingWorld) {
-            plugin.getLogger().warning("[McGunsLoot] Some worlds not loaded. Retrying links in 5s...");
             new BukkitRunnable() {
                 @Override
                 public void run() { attemptChestLoad(); }
             }.runTaskLater(plugin, 100L);
-        } else {
-            plugin.getLogger().info("[McGunsLoot] Loaded " + linkedChests.size() + " chests.");
         }
     }
 
-    public void saveToConfig() {
-        FileConfiguration cfg = plugin.getConfig();
-        cfg.set("tables", null);
-        cfg.set("chests", null);
+    // ================= GETTERS & SETTERS =================
 
-        for (Map.Entry<String, LootTable> entry : tables.entrySet()) {
-            entry.getValue().saveToConfig(cfg.createSection("tables." + entry.getKey()));
-        }
+    public Set<Location> getLinkedChestLocations() { return linkedChests.keySet(); }
 
-        int index = 0;
-        for (Map.Entry<Location, String> entry : linkedChests.entrySet()) {
-            Location loc = entry.getKey();
-            if (loc.getWorld() == null) continue;
+    public LootTable createTable(String name) {
+        LootTable table = new LootTable(name);
+        tables.put(name.toLowerCase(), table);
+        saveToConfig();
+        return table;
+    }
 
-            String path = "chests." + index;
-            cfg.set(path + ".world", loc.getWorld().getName());
-            cfg.set(path + ".x", loc.getBlockX());
-            cfg.set(path + ".y", loc.getBlockY());
-            cfg.set(path + ".z", loc.getBlockZ());
-            cfg.set(path + ".table", entry.getValue());
-            index++;
-        }
-        plugin.saveConfig();
+    public LootTable getTable(String name) { return tables.get(name.toLowerCase()); }
+    public boolean tableExists(String name) { return tables.containsKey(name.toLowerCase()); }
+    public Set<String> getAllTableNames() { return tables.keySet(); }
+    public void linkChest(Location loc, String tableName) { linkedChests.put(loc, tableName.toLowerCase()); saveToConfig(); }
+    public void unlinkChest(Location loc) { linkedChests.remove(loc); cooldowns.remove(loc); saveToConfig(); }
+    public boolean isLinked(Location loc) { return linkedChests.containsKey(loc); }
+    public LootTable getLootTable(Location loc) { String name = linkedChests.get(loc); return name == null ? null : tables.get(name.toLowerCase()); }
+
+    public int getRemainingCooldown(Player player, Location loc) {
+        Map<UUID, Long> map = cooldowns.get(loc);
+        if (map == null) return 0;
+        Long expires = map.get(player.getUniqueId());
+        if (expires == null) return 0;
+        long diff = expires - System.currentTimeMillis();
+        return diff > 0 ? (int) (diff / 1000) : 0;
+    }
+
+    public void setCooldown(Location loc, Player player, int seconds) {
+        cooldowns
+            .computeIfAbsent(loc, k -> new ConcurrentHashMap<>())
+            .put(player.getUniqueId(), System.currentTimeMillis() + (seconds * 1000L));
     }
 }
