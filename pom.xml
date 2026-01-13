@@ -60,6 +60,15 @@
             <systemPath>${project.basedir}/lib/levels.jar</systemPath>
         </dependency>
 
+                <dependency>
+            <groupId>com.phobia.mcgunsbase</groupId>
+            <artifactId>mcgunsbase</artifactId>
+            <version>1.0.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/mcgunsbase.jar</systemPath>
+        </dependency>
+
+
     </dependencies>
 
 </project>

@@ -16,6 +16,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import com.phobia.mcgunsbase.quests.QuestManager;
+import com.phobia.mcgunsbase.quests.QuestType;
+
 public class LootManager {
 
     private final McGunsLoot plugin;
@@ -89,6 +92,10 @@ public class LootManager {
             }
         }
 
+        // PATCH: Update the Loot Unique quest progress. 
+        // This only runs when the chest is fresh or the cooldown has expired.
+        QuestManager.getInstance().updateProgress(player, QuestType.LOOT_UNIQUE, 1);
+
         applySpecialRewards(player);
 
         Inventory inv = CustomInventoryFactory.createLootInventory(this, loc, player);
@@ -99,7 +106,6 @@ public class LootManager {
     // ================= CONFIG & DATA MANAGEMENT =================
 
     public void loadFromConfig() {
-        // FORCE the plugin to read the file from disk, ignoring memory
         plugin.reloadConfig();
         FileConfiguration cfg = plugin.getConfig();
 
@@ -108,7 +114,6 @@ public class LootManager {
         cooldowns.clear();
         activeInventories.clear();
         
-        // Ensure Reward defaults are present in the config if they are missing
         boolean needsSave = false;
         if (!cfg.contains("rewards.xp.chance")) { cfg.set("rewards.xp.chance", 1.0); needsSave = true; }
         if (!cfg.contains("rewards.tokens.chance")) { cfg.set("rewards.tokens.chance", 1.0); needsSave = true; }
@@ -131,7 +136,6 @@ public class LootManager {
     public void saveToConfig() {
         FileConfiguration cfg = plugin.getConfig();
         
-        // Build tables and chests from scratch
         cfg.set("tables", null);
         cfg.set("chests", null);
 
@@ -153,7 +157,6 @@ public class LootManager {
             index++;
         }
         
-        // Save the file. Because we didn't touch the "rewards" key, it remains as is.
         plugin.saveConfig();
     }
 
