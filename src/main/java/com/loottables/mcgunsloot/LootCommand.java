@@ -28,16 +28,16 @@ public class LootCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
 
-        if (args[0].equalsIgnoreCase("reload")) {
-    if (!sender.hasPermission("mcgunsloot.admin")) return true;
-    
-    // Reload the configuration
-    plugin.reloadConfig();
-    lootManager.loadFromConfig();
-    
-    sender.sendMessage("§a[McGunsLoot] Config and Loot Tables reloaded!");
-    return true;
-}
+        if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
+            if (!sender.hasPermission("mcgunsloot.admin")) return true;
+            
+            // Reload the configuration
+            plugin.reloadConfig();
+            lootManager.loadFromConfig();
+            
+            sender.sendMessage("§a[McGunsLoot] Config and Loot Tables reloaded!");
+            return true;
+        }
 
         if (!(sender instanceof Player player)) {
             sender.sendMessage("This command can only be used in-game.");
@@ -143,13 +143,16 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                     for (org.bukkit.Chunk chunk : player.getWorld().getLoadedChunks()) {
                         for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
                             if (state instanceof Chest) {
-                                lootManager.linkChest(state.getLocation(), name);
-                                count++;
+                                // FIXED: Skip if already linked
+                                if (!lootManager.isLinked(state.getLocation())) {
+                                    lootManager.linkChest(state.getLocation(), name);
+                                    count++;
+                                }
                             }
                         }
                     }
                     lootManager.saveToConfig();
-                    player.sendMessage("§aLinked §e" + count + " §achests in world: " + player.getWorld().getName());
+                    player.sendMessage("§aLinked §e" + count + " §anew chests in world: " + player.getWorld().getName());
                 } else {
                     try {
                         int radius = Integer.parseInt(args[2]);
@@ -160,14 +163,17 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                                 for (int z = -radius; z <= radius; z++) {
                                     Block b = origin.clone().add(x, y, z).getBlock();
                                     if (b.getType() == Material.CHEST || b.getType() == Material.TRAPPED_CHEST) {
-                                        lootManager.linkChest(b.getLocation(), name);
-                                        count++;
+                                        // FIXED: Skip if already linked
+                                        if (!lootManager.isLinked(b.getLocation())) {
+                                            lootManager.linkChest(b.getLocation(), name);
+                                            count++;
+                                        }
                                     }
                                 }
                             }
                         }
                         lootManager.saveToConfig();
-                        player.sendMessage("§aLinked §e" + count + " §achests within " + radius + " blocks.");
+                        player.sendMessage("§aLinked §e" + count + " §anew chests within " + radius + " blocks.");
                     } catch (NumberFormatException e) {
                         player.sendMessage("§cUse a number for radius or 'world'.");
                     }
@@ -181,6 +187,12 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                 player.sendMessage("§cLook at a chest or specify a radius/world.");
                 return true;
             }
+            
+            if (lootManager.isLinked(chest.getLocation())) {
+                player.sendMessage("§cThis chest is already linked to a loot table!");
+                return true;
+            }
+
             lootManager.linkChest(chest.getLocation(), name);
             lootManager.saveToConfig();
             player.sendMessage("§aLinked single chest.");
@@ -210,7 +222,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
-            for (String s : List.of("create", "additem", "edit", "link", "unlink")) {
+            for (String s : List.of("create", "additem", "edit", "link", "unlink", "reload")) {
                 if (s.startsWith(prefix)) out.add(s);
             }
         }
