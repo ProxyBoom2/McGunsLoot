@@ -22,8 +22,12 @@ public class CustomInventoryFactory {
     public static Inventory createLootInventory(LootManager lootManager, Location loc, Player player) {
         LootTable table = lootManager.getLootTable(loc);
         int cd = lootManager.getRemainingCooldown(player, loc);
+        
+        // Check if the chest is lucky for this generation
+        boolean isLucky = lootManager.isLucky(player, loc);
 
-        String title = "§6§lMCGUNS";
+        // Update title if lucky
+        String title = isLucky ? "§6§lMCGUNS §e§l(LUCKY)" : "§6§lMCGUNS";
         Inventory inv = Bukkit.createInventory(null, 27, title);
 
         if (cd <= 0 && table != null) {
@@ -45,12 +49,20 @@ public class CustomInventoryFactory {
                 int itemsFound = 0;
                 int maxItems = 1 + lootManager.getRandom().nextInt(4); // Target: 1 to 4 items
 
+                // Get multiplier from config (default to 2.0 if missing)
+                double multiplier = lootManager.getLootTable(loc) != null ? 
+                        Bukkit.getPluginManager().getPlugin("McGunsLoot").getConfig().getDouble("lucky-chest.multiplier", 2.0) : 1.0;
+
                 for (LootEntry entry : accessibleLoot) {
                     // Stop once we hit our random cap (1-4)
                     if (itemsFound >= maxItems) break;
 
                     double roll = lootManager.getRandom().nextDouble() * 100;
-                    if (roll < entry.getWeight()) {
+                    
+                    // APPLY MULTIPLIER: Boost the weight if the chest is lucky
+                    double finalWeight = isLucky ? (entry.getWeight() * multiplier) : entry.getWeight();
+
+                    if (roll < finalWeight) {
                         spawnItemInInv(inv, entry, slots.get(itemsFound), lootManager);
                         itemsFound++;
                     }

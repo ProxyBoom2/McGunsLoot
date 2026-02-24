@@ -27,6 +27,9 @@ public class LootManager {
     private final Map<Location, String> linkedChests = new ConcurrentHashMap<>();
     private final Map<Location, Map<UUID, Long>> cooldowns = new ConcurrentHashMap<>();
     
+    // Tracks which locations are "Lucky" for specific players
+    private final Map<UUID, Map<Location, Boolean>> luckyChests = new ConcurrentHashMap<>();
+    
     private final Map<UUID, Map<Location, Inventory>> activeInventories = new HashMap<>();
     
     private final Random random = new Random();
@@ -36,6 +39,37 @@ public class LootManager {
     }
 
     public Random getRandom() { return random; }
+
+    // ================= LUCKY CHEST LOGIC =================
+
+    public boolean isLucky(Player player, Location loc) {
+        Map<Location, Boolean> playerLuckyMap = luckyChests.get(player.getUniqueId());
+        return playerLuckyMap != null && playerLuckyMap.getOrDefault(loc, false);
+    }
+
+    /**
+     * Force sets a chest to lucky for a specific player (used for testing)
+     */
+    public void setLucky(Player player, Location loc, boolean lucky) {
+        if (lucky) {
+            luckyChests.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>()).put(loc, true);
+        } else {
+            if (luckyChests.containsKey(player.getUniqueId())) {
+                luckyChests.get(player.getUniqueId()).remove(loc);
+            }
+        }
+    }
+
+    private void rollLuckyStatus(Player player, Location loc) {
+        double chance = plugin.getConfig().getDouble("lucky-chest.chance", 5.0);
+        if (random.nextDouble() * 100 < chance) {
+            luckyChests.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>()).put(loc, true);
+        } else {
+            if (luckyChests.containsKey(player.getUniqueId())) {
+                luckyChests.get(player.getUniqueId()).remove(loc);
+            }
+        }
+    }
 
     // ================= SPECIAL REWARDS (XP & TOKENS) =================
 
@@ -92,14 +126,17 @@ public class LootManager {
             }
         }
 
-        // PATCH: Update the Loot Unique quest progress. 
-        // This only runs when the chest is fresh or the cooldown has expired.
         QuestManager.getInstance().updateProgress(player, QuestType.LOOT_UNIQUE, 1);
-
         applySpecialRewards(player);
 
         Inventory inv = CustomInventoryFactory.createLootInventory(this, loc, player);
         saveActiveInventory(player, loc, inv);
+        
+        // Remove lucky status once looted
+        if (luckyChests.containsKey(player.getUniqueId())) {
+            luckyChests.get(player.getUniqueId()).remove(loc);
+        }
+        
         return inv;
     }
 
@@ -113,10 +150,15 @@ public class LootManager {
         linkedChests.clear();
         cooldowns.clear();
         activeInventories.clear();
+        luckyChests.clear();
         
         boolean needsSave = false;
         if (!cfg.contains("rewards.xp.chance")) { cfg.set("rewards.xp.chance", 1.0); needsSave = true; }
         if (!cfg.contains("rewards.tokens.chance")) { cfg.set("rewards.tokens.chance", 1.0); needsSave = true; }
+        
+        if (!cfg.contains("lucky-chest.chance")) { cfg.set("lucky-chest.chance", 5.0); needsSave = true; }
+        if (!cfg.contains("lucky-chest.multiplier")) { cfg.set("lucky-chest.multiplier", 2.0); needsSave = true; }
+        
         if (needsSave) plugin.saveConfig();
         
         ConfigurationSection tSec = cfg.getConfigurationSection("tables");
@@ -217,11 +259,22 @@ public class LootManager {
 
     public int getRemainingCooldown(Player player, Location loc) {
         Map<UUID, Long> map = cooldowns.get(loc);
-        if (map == null) return 0;
+        if (map == null) {
+            if (!isLucky(player, loc)) rollLuckyStatus(player, loc);
+            return 0;
+        }
         Long expires = map.get(player.getUniqueId());
-        if (expires == null) return 0;
+        if (expires == null) {
+            if (!isLucky(player, loc)) rollLuckyStatus(player, loc);
+            return 0;
+        }
         long diff = expires - System.currentTimeMillis();
-        return diff > 0 ? (int) (diff / 1000) : 0;
+        
+        if (diff <= 0) {
+            if (!isLucky(player, loc)) rollLuckyStatus(player, loc);
+            return 0;
+        }
+        return (int) (diff / 1000);
     }
 
     public void setCooldown(Location loc, Player player, int seconds) {

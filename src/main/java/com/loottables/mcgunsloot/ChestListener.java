@@ -27,16 +27,11 @@ public class ChestListener implements Listener {
         Location loc = chest.getLocation();
         if (!lootManager.isLinked(loc)) return;
 
-        // Cancel vanilla opening to show our custom UI
         event.setCancelled(true);
 
-        // PATCH: Always use LootManager to fetch the inventory.
-        // This ensures the Reward logic and Debug logs inside LootManager are always triggered.
         Inventory inv = lootManager.getOrCreateActiveInventory(player, loc);
-
         player.openInventory(inv);
 
-        // Update clock every second
         new BukkitRunnable() {
             @Override
             public void run() {

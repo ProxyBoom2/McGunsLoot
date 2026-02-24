@@ -41,11 +41,24 @@ public class McGunsLoot extends JavaPlugin {
                         
                         if (p.getLocation().distanceSquared(loc) < 144) {
                             if (lootManager.getRemainingCooldown(p, loc) == 0) {
-                                p.spawnParticle(
-                                    Particle.VILLAGER_HAPPY, 
-                                    loc.clone().add(0.5, 1.1, 0.5), 
-                                    2, 0.15, 0.15, 0.15, 0
-                                );
+                                
+                                // REPLACEMENT LOGIC: 
+                                // We check lucky status first to determine which single particle type to show.
+                                if (lootManager.isLucky(p, loc)) {
+                                // Rare Lucky Chest: Gold/Yellow Totem sparks
+                                    p.spawnParticle(
+    Particle.DRIP_LAVA, 
+    loc.clone().add(0.5, 1.2, 0.5), 
+    1, 0.2, 0, 0.2, 0
+);
+                                } else {
+                                    // Standard Chest: Green Villager Happy particles
+                                    p.spawnParticle(
+                                        Particle.VILLAGER_HAPPY, 
+                                        loc.clone().add(0.5, 1.1, 0.5), 
+                                        2, 0.15, 0.15, 0.15, 0
+                                    );
+                                }
                             }
                         }
                     }
@@ -53,12 +66,9 @@ public class McGunsLoot extends JavaPlugin {
             }
         }.runTaskTimer(this, 20L, 20L);
 
-        getLogger().info("McGunsLoot enabled. Data persistence fixed.");
+        getLogger().info("McGunsLoot enabled. Particle replacement logic applied.");
     }
 
-    /**
-     * Helper method to reload the plugin entirely
-     */
     public void reloadPlugin() {
         reloadConfig();
         lootManager.loadFromConfig();
@@ -66,8 +76,6 @@ public class McGunsLoot extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        // REMOVED lootManager.saveToConfig() 
-        // This prevents the plugin from overwriting your manual config edits on shutdown!
         getLogger().info("McGunsLoot disabled safely.");
     }
 }

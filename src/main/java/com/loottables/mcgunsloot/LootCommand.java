@@ -31,7 +31,6 @@ public class LootCommand implements CommandExecutor, TabCompleter {
         if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("mcgunsloot.admin")) return true;
             
-            // Reload the configuration
             plugin.reloadConfig();
             lootManager.loadFromConfig();
             
@@ -51,6 +50,20 @@ public class LootCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§e/loots edit <name> §7- Edit a loot table");
             player.sendMessage("§e/loots link <name> [radius/world] §7- Link chests");
             player.sendMessage("§e/loots unlink §7- Unlink looked-at chest");
+            player.sendMessage("§e/loots setlucky §7- Force a chest to be lucky (Testing)");
+            return true;
+        }
+
+        // /loots setlucky
+        if (args[0].equalsIgnoreCase("setlucky")) {
+            if (!player.hasPermission("mcgunsloot.admin")) return true;
+            Block target = player.getTargetBlockExact(5);
+            if (target == null || !lootManager.isLinked(target.getLocation())) {
+                player.sendMessage("§cYou must be looking at a linked chest!");
+                return true;
+            }
+            lootManager.setLucky(player, target.getLocation(), true);
+            player.sendMessage("§a[Testing] This chest is now §eLUCKY §afor you.");
             return true;
         }
 
@@ -71,7 +84,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // /loots additem <tableName> <minLevel> <minQty> <maxQty> <weight>
+        // /loots additem ... (Omitted for brevity, kept same as original)
         if (args[0].equalsIgnoreCase("additem")) {
             if (args.length < 6) {
                 player.sendMessage("§cUsage: /loots additem <tableName> <minLevel> <minQty> <maxQty> <weight>");
@@ -136,14 +149,12 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
-            // Radius/World Linking
             if (args.length == 3) {
                 if (args[2].equalsIgnoreCase("world")) {
                     int count = 0;
                     for (org.bukkit.Chunk chunk : player.getWorld().getLoadedChunks()) {
                         for (org.bukkit.block.BlockState state : chunk.getTileEntities()) {
                             if (state instanceof Chest) {
-                                // FIXED: Skip if already linked
                                 if (!lootManager.isLinked(state.getLocation())) {
                                     lootManager.linkChest(state.getLocation(), name);
                                     count++;
@@ -163,7 +174,6 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                                 for (int z = -radius; z <= radius; z++) {
                                     Block b = origin.clone().add(x, y, z).getBlock();
                                     if (b.getType() == Material.CHEST || b.getType() == Material.TRAPPED_CHEST) {
-                                        // FIXED: Skip if already linked
                                         if (!lootManager.isLinked(b.getLocation())) {
                                             lootManager.linkChest(b.getLocation(), name);
                                             count++;
@@ -181,7 +191,6 @@ public class LootCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
-            // Single Chest Linking
             Block target = player.getTargetBlockExact(5);
             if (target == null || !(target.getState() instanceof Chest chest)) {
                 player.sendMessage("§cLook at a chest or specify a radius/world.");
@@ -222,7 +231,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
-            for (String s : List.of("create", "additem", "edit", "link", "unlink", "reload")) {
+            for (String s : List.of("create", "additem", "edit", "link", "unlink", "reload", "setlucky")) {
                 if (s.startsWith(prefix)) out.add(s);
             }
         }
@@ -244,10 +253,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args[0].equalsIgnoreCase("link") && args.length == 3) {
-            out.add("world");
-            out.add("5");
-            out.add("10");
-            out.add("20");
+            out.addAll(List.of("world", "5", "10", "20"));
         }
 
         return out;
