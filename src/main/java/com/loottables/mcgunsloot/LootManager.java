@@ -42,7 +42,12 @@ public class LootManager {
 
     // ================= LUCKY CHEST LOGIC =================
 
+    public boolean isLuckyEnabled() {
+        return plugin.getConfig().getBoolean("lucky-chest.enabled", true);
+    }
+
     public boolean isLucky(Player player, Location loc) {
+        if (!isLuckyEnabled()) return false;
         Map<Location, Boolean> playerLuckyMap = luckyChests.get(player.getUniqueId());
         return playerLuckyMap != null && playerLuckyMap.getOrDefault(loc, false);
     }
@@ -61,6 +66,9 @@ public class LootManager {
     }
 
     private void rollLuckyStatus(Player player, Location loc) {
+        // Optimization: Don't even roll if the system is toggled off
+        if (!isLuckyEnabled()) return;
+
         double chance = plugin.getConfig().getDouble("lucky-chest.chance", 5.0);
         if (random.nextDouble() * 100 < chance) {
             luckyChests.computeIfAbsent(player.getUniqueId(), k -> new HashMap<>()).put(loc, true);
@@ -156,6 +164,7 @@ public class LootManager {
         if (!cfg.contains("rewards.xp.chance")) { cfg.set("rewards.xp.chance", 1.0); needsSave = true; }
         if (!cfg.contains("rewards.tokens.chance")) { cfg.set("rewards.tokens.chance", 1.0); needsSave = true; }
         
+        if (!cfg.contains("lucky-chest.enabled")) { cfg.set("lucky-chest.enabled", true); needsSave = true; }
         if (!cfg.contains("lucky-chest.chance")) { cfg.set("lucky-chest.chance", 5.0); needsSave = true; }
         if (!cfg.contains("lucky-chest.multiplier")) { cfg.set("lucky-chest.multiplier", 2.0); needsSave = true; }
         

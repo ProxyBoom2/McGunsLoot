@@ -14,6 +14,11 @@ rewards:
     max: 5
     command: "givetokens %player% %amount%"
 
+lucky-chest:
+  enabled: true
+  chance: 5.0
+  multiplier: 2.0
+
 tables:
   default:
     cooldown: 500

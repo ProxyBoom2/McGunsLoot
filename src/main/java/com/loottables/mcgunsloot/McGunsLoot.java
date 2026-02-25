@@ -43,14 +43,14 @@ public class McGunsLoot extends JavaPlugin {
                             if (lootManager.getRemainingCooldown(p, loc) == 0) {
                                 
                                 // REPLACEMENT LOGIC: 
-                                // We check lucky status first to determine which single particle type to show.
-                                if (lootManager.isLucky(p, loc)) {
-                                // Rare Lucky Chest: Gold/Yellow Totem sparks
+                                // Now respects the Global Toggle.
+                                if (lootManager.isLuckyEnabled() && lootManager.isLucky(p, loc)) {
+                                    // Lucky Chest: Lava Drip
                                     p.spawnParticle(
-    Particle.DRIP_LAVA, 
-    loc.clone().add(0.5, 1.2, 0.5), 
-    1, 0.2, 0, 0.2, 0
-);
+                                        Particle.DRIP_LAVA, 
+                                        loc.clone().add(0.5, 1.2, 0.5), 
+                                        1, 0.2, 0, 0.2, 0
+                                    );
                                 } else {
                                     // Standard Chest: Green Villager Happy particles
                                     p.spawnParticle(

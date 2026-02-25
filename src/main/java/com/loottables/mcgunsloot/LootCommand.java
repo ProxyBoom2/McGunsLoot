@@ -38,6 +38,19 @@ public class LootCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        // /loots togglelucky - Handled for both console and players
+        if (args.length > 0 && args[0].equalsIgnoreCase("togglelucky")) {
+            if (!sender.hasPermission("mcgunsloot.admin")) return true;
+
+            boolean current = plugin.getConfig().getBoolean("lucky-chest.enabled", true);
+            plugin.getConfig().set("lucky-chest.enabled", !current);
+            plugin.saveConfig();
+
+            String status = !current ? "§aENABLED" : "§cDISABLED";
+            sender.sendMessage("§6[McGunsLoot] §fLucky chests are now " + status);
+            return true;
+        }
+
         if (!(sender instanceof Player player)) {
             sender.sendMessage("This command can only be used in-game.");
             return true;
@@ -51,6 +64,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
             player.sendMessage("§e/loots link <name> [radius/world] §7- Link chests");
             player.sendMessage("§e/loots unlink §7- Unlink looked-at chest");
             player.sendMessage("§e/loots setlucky §7- Force a chest to be lucky (Testing)");
+            player.sendMessage("§e/loots togglelucky §7- Globally enable/disable lucky chests");
             return true;
         }
 
@@ -84,7 +98,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
-        // /loots additem ... (Omitted for brevity, kept same as original)
+        // /loots additem
         if (args[0].equalsIgnoreCase("additem")) {
             if (args.length < 6) {
                 player.sendMessage("§cUsage: /loots additem <tableName> <minLevel> <minQty> <maxQty> <weight>");
@@ -231,7 +245,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             String prefix = args[0].toLowerCase();
-            for (String s : List.of("create", "additem", "edit", "link", "unlink", "reload", "setlucky")) {
+            for (String s : List.of("create", "additem", "edit", "link", "unlink", "reload", "setlucky", "togglelucky")) {
                 if (s.startsWith(prefix)) out.add(s);
             }
         }
