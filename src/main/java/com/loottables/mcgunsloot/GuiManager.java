@@ -23,6 +23,7 @@ public class GuiManager implements Listener {
     private final McGunsLoot plugin;
     private final LootManager lootManager;
     private final Map<Player, LootTable> editing = new HashMap<>();
+    private final Map<Player, Integer> pageMap = new HashMap<>();
 
     public GuiManager(McGunsLoot plugin, LootManager lootManager) {
         this.plugin = plugin;
@@ -30,15 +31,21 @@ public class GuiManager implements Listener {
     }
 
     public void openEditor(Player player, LootTable table) {
+        int page = pageMap.getOrDefault(player, 0);
         editing.put(player, table);
 
-        Inventory gui = Bukkit.createInventory(null, 54, "Loot Editor: " + table.getName());
+        String title = "Loot Editor: " + table.getName();
+        if (page > 0) title += " (Page " + (page + 1) + ")";
+        
+        Inventory gui = Bukkit.createInventory(null, 54, title);
 
+        List<LootEntry> entries = table.getEntries();
+        int startIndex = page * 45;
         int slot = 0;
-        for (LootEntry e : table.getEntries()) {
-            if (slot >= 53) break; 
-            
-            ItemStack item = e.getItemStack().clone(); 
+
+        for (int i = startIndex; i < entries.size() && slot < 45; i++) {
+            LootEntry e = entries.get(i);
+            ItemStack item = e.getItemStack().clone();
             ItemMeta meta = item.getItemMeta();
 
             List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
@@ -47,7 +54,7 @@ public class GuiManager implements Listener {
             lore.add("§7Min: §f" + e.getMin());
             lore.add("§7Max: §f" + e.getMax());
             lore.add("§7Weight: §f" + e.getWeight());
-            lore.add("§7Req Level: §b" + e.getMinLevel()); 
+            lore.add("§7Req Level: §b" + e.getMinLevel());
             lore.add("");
             lore.add("§cClick to remove");
 
@@ -56,12 +63,33 @@ public class GuiManager implements Listener {
             gui.setItem(slot++, item);
         }
 
+        // --- Navigation & Action Buttons ---
+        
+        // Add Button (Slot 49 - Bottom Middle)
         ItemStack add = new ItemStack(Material.EMERALD_BLOCK);
         ItemMeta am = add.getItemMeta();
         am.setDisplayName("§aAdd New Loot Entry");
         am.setLore(Arrays.asList("§7(Adds a default Diamond)", "§7Use /loots additem for custom items"));
         add.setItemMeta(am);
-        gui.setItem(53, add);
+        gui.setItem(49, add);
+
+        // Previous Page (Slot 45)
+        if (page > 0) {
+            ItemStack prev = new ItemStack(Material.ARROW);
+            ItemMeta pm = prev.getItemMeta();
+            pm.setDisplayName("§ePrevious Page");
+            prev.setItemMeta(pm);
+            gui.setItem(45, prev);
+        }
+
+        // Next Page (Slot 53)
+        if (entries.size() > startIndex + 45) {
+            ItemStack next = new ItemStack(Material.ARROW);
+            ItemMeta nm = next.getItemMeta();
+            nm.setDisplayName("§eNext Page");
+            next.setItemMeta(nm);
+            gui.setItem(53, next);
+        }
 
         player.openInventory(gui);
     }
@@ -71,15 +99,13 @@ public class GuiManager implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         String title = event.getView().getTitle();
 
-        // 1. Handle Loot Chest Interaction (The Fix)
+        // 1. Handle Loot Chest Interaction
         if (title.equals("§6§lMCGUNS")) {
-            // Cancel if clicking the clock slot directly
             if (event.getRawSlot() == CustomInventoryFactory.CLOCK_SLOT) {
                 event.setCancelled(true);
                 return;
             }
 
-            // Prevent duplicating/moving the clock via Shift-Click or Hotkeys
             if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY || 
                 event.getAction() == InventoryAction.HOTBAR_SWAP || 
                 event.getAction() == InventoryAction.HOTBAR_MOVE_AND_READD) {
@@ -100,18 +126,38 @@ public class GuiManager implements Listener {
             if (table == null) return;
 
             int slot = event.getRawSlot();
+            int currentPage = pageMap.getOrDefault(player, 0);
 
-            if (slot == 53) {
-                table.addEntry(new LootEntry(new ItemStack(Material.DIAMOND), 1, 1, 10, 0));
+            // Add Item Logic
+            if (slot == 49) {
+                table.addEntry(new LootEntry(new ItemStack(Material.DIAMOND), 0, 1, 1, 10));
                 lootManager.saveToConfig();
                 openEditor(player, table);
                 return;
             }
 
-            if (slot >= 0 && slot < table.getEntries().size()) {
-                table.removeEntry(slot);
-                lootManager.saveToConfig();
+            // Previous Page
+            if (slot == 45 && currentPage > 0) {
+                pageMap.put(player, currentPage - 1);
                 openEditor(player, table);
+                return;
+            }
+
+            // Next Page
+            if (slot == 53 && table.getEntries().size() > (currentPage + 1) * 45) {
+                pageMap.put(player, currentPage + 1);
+                openEditor(player, table);
+                return;
+            }
+
+            // Remove Item Logic
+            if (slot >= 0 && slot < 45) {
+                int entryIndex = (currentPage * 45) + slot;
+                if (entryIndex < table.getEntries().size()) {
+                    table.removeEntry(entryIndex);
+                    lootManager.saveToConfig();
+                    openEditor(player, table);
+                }
             }
         }
     }
@@ -119,7 +165,9 @@ public class GuiManager implements Listener {
     @EventHandler
     public void onClose(InventoryCloseEvent event) {
         if (event.getView().getTitle().startsWith("Loot Editor: ")) {
-            editing.remove((Player) event.getPlayer());
+            Player p = (Player) event.getPlayer();
+            editing.remove(p);
+            pageMap.remove(p); // Reset page on close
         }
     }
 }
