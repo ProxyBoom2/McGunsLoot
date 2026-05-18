@@ -20,40 +20,36 @@ public class LootTable {
     public void setCooldownSeconds(int seconds) { this.cooldownSeconds = seconds; }
     public int getCooldownSeconds() { return cooldownSeconds; }
 
-    public void addItem(ItemStack item, int minLevel, int min, int max, int chance) {
-        // We still use LootEntry, but 'weight' is now treated as 'chance'
-        entries.add(new LootEntry(item, min, max, chance, minLevel));
+    public void addItem(ItemStack item, int minLevel, int min, int max, int rarity) {
+        entries.add(new LootEntry(item, min, max, rarity, minLevel));
     }
 
     public void addEntry(LootEntry entry) { entries.add(entry); }
 
-    public void removeEntry(int index) { 
-        if (index >= 0 && index < entries.size()) entries.remove(index); 
+    public void removeEntry(int index) {
+        if (index >= 0 && index < entries.size()) entries.remove(index);
     }
 
     public List<LootEntry> getEntries() { return Collections.unmodifiableList(entries); }
 
     /**
-     * Logic Change: Independent Percentage Rolls
-     * This method will return a list of items that "passed" their percentage check.
+     * Rolls loot using a 1-in-X rarity system.
+     * e.g. rarity=5000 means a 1-in-5000 (0.02%) chance per roll.
      */
     public List<ItemStack> rollLoot() {
         List<ItemStack> results = new ArrayList<>();
-        
+
         for (LootEntry entry : entries) {
-            // Roll 0.0 to 100.0
+            // Convert "1 in X" rarity to a percentage: 100.0 / rarity
+            double chance = 100.0 / entry.getRarity();
             double roll = random.nextDouble() * 100;
-            
-            // If weight is 5, it needs to roll below 5.0 to succeed
-            if (roll < entry.getWeight()) {
+
+            if (roll < chance) {
                 ItemStack stack = entry.getItemStack().clone();
-                
-                // Determine random amount between min and max
                 int amount = entry.getMin();
                 if (entry.getMax() > entry.getMin()) {
                     amount = random.nextInt((entry.getMax() - entry.getMin()) + 1) + entry.getMin();
                 }
-                
                 stack.setAmount(amount);
                 results.add(stack);
             }
@@ -63,14 +59,14 @@ public class LootTable {
 
     public void saveToConfig(ConfigurationSection section) {
         section.set("cooldown", cooldownSeconds);
-        section.set("items", null); 
+        section.set("items", null);
         for (int i = 0; i < entries.size(); i++) {
             LootEntry e = entries.get(i);
             ConfigurationSection cs = section.createSection("items." + i);
-            cs.set("item", e.getItemStack()); 
+            cs.set("item", e.getItemStack());
             cs.set("min", e.getMin());
             cs.set("max", e.getMax());
-            cs.set("weight", e.getWeight()); // Keeping key as 'weight' to avoid breaking old configs
+            cs.set("rarity", e.getRarity());
             cs.set("minLevel", e.getMinLevel());
         }
     }
@@ -78,7 +74,7 @@ public class LootTable {
     public static LootTable loadFromConfig(String name, ConfigurationSection section) {
         LootTable table = new LootTable(name);
         if (section.contains("cooldown")) table.cooldownSeconds = section.getInt("cooldown");
-        
+
         ConfigurationSection items = section.getConfigurationSection("items");
         if (items != null) {
             for (String key : items.getKeys(false)) {
@@ -98,11 +94,22 @@ public class LootTable {
 
                 if (item == null) item = new ItemStack(Material.BARRIER);
 
+                // Backwards compatibility: if old "weight" key exists and "rarity" does not,
+                // treat the old weight value as a rarity by converting it (weight=10 -> rarity=10).
+                int rarity;
+                if (cs.contains("rarity")) {
+                    rarity = cs.getInt("rarity", 1000);
+                } else {
+                    // Old weight was a percentage (e.g. 10 = 10%). Convert to 1-in-X.
+                    int oldWeight = cs.getInt("weight", 10);
+                    rarity = Math.max(1, (int) Math.round(100.0 / oldWeight));
+                }
+
                 table.addEntry(new LootEntry(
                         item,
                         cs.getInt("min", 1),
                         cs.getInt("max", 1),
-                        cs.getInt("weight", 10), // This is now 10%
+                        rarity,
                         cs.getInt("minLevel", 0)
                 ));
             }

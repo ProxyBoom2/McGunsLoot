@@ -53,7 +53,7 @@ public class GuiManager implements Listener {
             lore.add("§6--- Editor Stats ---");
             lore.add("§7Min: §f" + e.getMin());
             lore.add("§7Max: §f" + e.getMax());
-            lore.add("§7Weight: §f" + e.getWeight());
+            lore.add("§7Rarity: §f" + e.getRarity());
             lore.add("§7Req Level: §b" + e.getMinLevel());
             lore.add("");
             lore.add("§cClick to remove");

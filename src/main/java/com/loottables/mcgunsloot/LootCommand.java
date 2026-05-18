@@ -27,6 +27,11 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public boolean onCommand(CommandSender sender, Command cmd, String label, String[] args) {
+        // Global permission check for the base command
+        if (!sender.hasPermission("mcgunsloot.use")) {
+            sender.sendMessage("§cYou do not have permission to use this command.");
+            return true;
+        }
 
         if (args.length > 0 && args[0].equalsIgnoreCase("reload")) {
             if (!sender.hasPermission("mcgunsloot.admin")) return true;
@@ -83,6 +88,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         // /loots create <name>
         if (args[0].equalsIgnoreCase("create")) {
+            if (!player.hasPermission("mcgunsloot.admin")) return true;
             if (args.length < 2) {
                 player.sendMessage("§cUsage: /loots create <name>");
                 return true;
@@ -100,6 +106,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         // /loots additem
         if (args[0].equalsIgnoreCase("additem")) {
+            if (!player.hasPermission("mcgunsloot.admin")) return true;
             if (args.length < 6) {
                 player.sendMessage("§cUsage: /loots additem <tableName> <minLevel> <minQty> <maxQty> <weight>");
                 return true;
@@ -137,6 +144,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         // /loots edit <name>
         if (args[0].equalsIgnoreCase("edit")) {
+            if (!player.hasPermission("mcgunsloot.admin")) return true;
             if (args.length < 2) {
                 player.sendMessage("§cUsage: /loots edit <name>");
                 return true;
@@ -153,6 +161,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         // /loots link <name> [radius/world]
         if (args[0].equalsIgnoreCase("link")) {
+            if (!player.hasPermission("mcgunsloot.admin")) return true;
             if (args.length < 2) {
                 player.sendMessage("§cUsage: /loots link <tableName> [radius/world]");
                 return true;
@@ -224,6 +233,7 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
         // /loots unlink
         if (args[0].equalsIgnoreCase("unlink")) {
+            if (!player.hasPermission("mcgunsloot.admin")) return true;
             Block target = player.getTargetBlockExact(5);
             if (target == null || !(target.getState() instanceof Chest chest)) {
                 player.sendMessage("§cYou must be looking at a chest within 5 blocks.");
@@ -241,6 +251,8 @@ public class LootCommand implements CommandExecutor, TabCompleter {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command cmd, String alias, String[] args) {
+        if (!sender.hasPermission("mcgunsloot.use")) return new ArrayList<>();
+        
         List<String> out = new ArrayList<>();
 
         if (args.length == 1) {

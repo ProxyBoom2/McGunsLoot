@@ -11,4 +11,4 @@ commands:
     permission: mcgunsloot.use
 permissions:
   mcgunsloot.use:
-    default: true
+    default: op
